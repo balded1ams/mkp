@@ -4,7 +4,10 @@ mkp is a software to manage templates
 
 install : `make -B`
 to access it from everywhere add it to the binary :
-`[TODO]`
+```bash
+ $ sudo chmod +x mkp
+ $ sudo ln -s /path/to/binary /usr/local/bin/mkp
+```
 
 add your project template to `.local/template` the name of the templates should be the name of the language 
 if you don't want to add yours or don't have any, you can get mine through the software: `mkp --init`
