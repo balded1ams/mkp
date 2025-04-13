@@ -26,21 +26,111 @@
 /* Description: Print the usage instructions.                                 */
 /* -------------------------------------------------------------------------- */
 void print_usage(const char *software) {
-    printf("\033[1;33mUsage:\033[0m %s [option]\n", software);
-    printf("Options:\n");
-    printf("  \033[1;32m-h\033[0m                print this help and exit\n");
-    printf("  \033[1;32m-c PROJECT:LANG\033[0m  create a project quickly\n");
+    printf("Utilisation : %s [option]\n", software);
+    printf("Options :\n");
+    printf("  -h                Afficher cette aide et quitter\n");
+    printf("  -c NOM:LANGAGE    Créer un projet avec le nom et le langage spécifiés\n");
+    printf("  --init            Initialiser les templates en clonant le dépôt GitHub\n");
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Function: init_templates                                                   */
+/* Description: add my templates as default                                   */
+/* -------------------------------------------------------------------------- */
+void init_templates(const char *template_dir_path) {
+    struct stat st = {0};
+    if (stat(template_dir_path, &st) == -1) {
+        if (mkdir(template_dir_path, 0755) != 0) {
+            perror("Erreur lors de la création du répertoire de templates");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    char command[1024];
+    snprintf(command, sizeof(command), "git clone https://github.com/chlorat3/template.git \"%s\"", template_dir_path);
+    int ret = system(command);
+    if (ret != 0) {
+        fprintf(stderr, "Erreur lors du clonage du dépôt Git\n");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Templates initialisés avec succès dans %s\n", template_dir_path);
+}
+
 
 /* -------------------------------------------------------------------------- */
 /* Function: copy_directory                                                   */
 /* Description: Copy the source directory to destination using a system call. */
 /* -------------------------------------------------------------------------- */
 int copy_directory(const char *src, const char *dst) {
-    char command[1024];
-    SAFE_SNPRINTF(command, sizeof(command), "cp -r \"%s\" \"%s\"", src, dst);
-    int ret = system(command);
-    return ret;
+    DIR *dir = opendir(src);
+    if (!dir) {
+        perror("Erreur lors de l'ouverture du répertoire source");
+        return -1;
+    }
+
+    struct dirent *entry;
+    char src_path[1024];
+    char dst_path[1024];
+
+    while ((entry = readdir(dir)) != NULL) {
+        // Ignorer les entrées spéciales
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        SAFE_SNPRINTF(src_path, sizeof(src_path), "%s/%s", src, entry->d_name);
+        SAFE_SNPRINTF(dst_path, sizeof(dst_path), "%s/%s", dst, entry->d_name);
+
+        struct stat st;
+        if (stat(src_path, &st) == -1) {
+            perror("Erreur lors de la lecture des informations du fichier source");
+            closedir(dir);
+            return -1;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            // Créer le sous-répertoire dans la destination
+            if (mkdir(dst_path, 0755) != 0 && errno != EEXIST) {
+                perror("Erreur lors de la création du sous-répertoire destination");
+                closedir(dir);
+                return -1;
+            }
+            // Appel récursif pour copier le contenu du sous-répertoire
+            if (copy_directory(src_path, dst_path) != 0) {
+                closedir(dir);
+                return -1;
+            }
+        } else {
+            // Copier le fichier
+            FILE *src_file = fopen(src_path, "rb");
+            if (!src_file) {
+                perror("Erreur lors de l'ouverture du fichier source");
+                closedir(dir);
+                return -1;
+            }
+
+            FILE *dst_file = fopen(dst_path, "wb");
+            if (!dst_file) {
+                perror("Erreur lors de la création du fichier destination");
+                fclose(src_file);
+                closedir(dir);
+                return -1;
+            }
+
+            char buffer[8192];
+            size_t bytes;
+            while ((bytes = fread(buffer, 1, sizeof(buffer), src_file)) > 0) {
+                fwrite(buffer, 1, bytes, dst_file);
+            }
+
+            fclose(src_file);
+            fclose(dst_file);
+        }
+    }
+
+    closedir(dir);
+    return 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -91,7 +181,20 @@ int main(int argc, char **argv) {
         if (strcmp(argv[1], "-h") == 0) {
             print_usage(argv[0]);
             return 0;
-        } else if (strcmp(argv[1], "-c") == 0) {
+        } else if (strcmp(argv[1], "--init") == 0){
+            const char *home = getenv("HOME");
+            if (home == NULL) {
+                fprintf(stderr, "Erreur : variable d'environnement HOME non définie\n");
+                return EXIT_FAILURE;
+            }
+
+            char template_dir_path[1024];
+            SAFE_SNPRINTF(template_dir_path, sizeof(template_dir_path), "%s/.local/template", home);
+
+            init_templates(template_dir_path);
+            return EXIT_SUCCESS;
+
+        }else if (strcmp(argv[1], "-c") == 0) {
             if (argc != 3) {
                 print_usage(argv[0]);
                 return 0;
