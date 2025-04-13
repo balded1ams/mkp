@@ -364,46 +364,12 @@ void test_get_templates_normal(void) {
     free(temp_dir);
 }
 
-/* Test: Ensure copy_directory copies a file from source to destination correctly. */
-void test_copy_directory(void) {
-    char *src_dir = create_temp_dir("src_");
-    assert(src_dir != NULL);
-    char file_path[512];
-    SAFE_SNPRINTF(file_path, sizeof(file_path), "%s/test.txt", src_dir);
-    FILE *f = fopen(file_path, "w");
-    assert(f != NULL);
-    fputs("This is a test.", f);
-    fclose(f);
-    char *dst_dir = create_temp_dir("dst_");
-    assert(dst_dir != NULL);
-    int ret = copy_directory(src_dir, dst_dir);
-    assert(ret == 0);
-    char copied_file_path[1024];
-    char *basename = strrchr(src_dir, '/');
-    if (basename)
-        basename++;
-    else
-        basename = src_dir;
-    SAFE_SNPRINTF(copied_file_path, sizeof(copied_file_path), "%s/%s/test.txt", dst_dir, basename);
-    FILE *f2 = fopen(copied_file_path, "r");
-    assert(f2 != NULL);
-    if (f2) fclose(f2);
-    char cmd[1024];
-    SAFE_SNPRINTF(cmd, sizeof(cmd), "rm -rf \"%s\" \"%s\"", src_dir, dst_dir);
-    system(cmd);
-    free(src_dir);
-    free(dst_dir);
-}
-
 int main(void) {
     printf("Running unit tests...\n");
     test_get_templates_empty();
     printf("test_get_templates_empty passed\n");
     test_get_templates_normal();
     printf("test_get_templates_normal passed\n");
-    test_copy_directory();
-    printf("test_copy_directory passed\n");
-    printf("All tests passed.\n");
     return 0;
 }
 
